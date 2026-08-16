@@ -1,0 +1,6 @@
+{
+  "MAX_LEN": 34,
+  "lang_pair": "en-hi",
+  "src_vocab_size": 23553,
+  "tgt_vocab_size": 21233
+}
