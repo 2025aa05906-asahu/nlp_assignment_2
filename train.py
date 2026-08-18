@@ -318,7 +318,7 @@ def train_model(args):
         len(src_vocab), len(tgt_vocab), pad_idx, sos_idx, eos_idx,
         emb_dim=args.emb_dim, hid_dim=args.hid_dim, dropout=args.dropout,
     )
-    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
+    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     criterion = nn.CrossEntropyLoss(ignore_index=pad_idx)
 
     print(f"Device: {DEVICE} | Src vocab: {len(src_vocab)} | Tgt vocab: {len(tgt_vocab)}")
@@ -326,6 +326,7 @@ def train_model(args):
 
     history = {"train_loss": [], "val_loss": []}
     best_val_loss = float("inf")
+    epochs_no_improve = 0
 
     for epoch in range(1, args.epochs + 1):
         start = time.time()
@@ -344,6 +345,7 @@ def train_model(args):
 
         if val_loss < best_val_loss:
             best_val_loss = val_loss
+            epochs_no_improve = 0
             torch.save({
                 "model_state_dict": model.state_dict(),
                 "hyperparameters": vars(args),
@@ -355,11 +357,19 @@ def train_model(args):
                 "val_loss": val_loss,
             }, os.path.join(args.model_dir, "nmt_model.pt"))
             print(f"  -> Saved new best checkpoint (val_loss={val_loss:.4f})")
+        else:
+            epochs_no_improve += 1
+            print(f"  -> No improvement for {epochs_no_improve}/{args.patience} epoch(s)")
+            if epochs_no_improve >= args.patience:
+                print(f"\nEarly stopping triggered: val loss hasn't improved in "
+                      f"{args.patience} epochs. Stopping at epoch {epoch}/{args.epochs}.")
+                break
 
-    # Loss curve plot
+    # Loss curve plot (use actual number of epochs run, in case of early stopping)
+    n_epochs_run = len(history["train_loss"])
     plt.figure(figsize=(7, 5))
-    plt.plot(range(1, args.epochs + 1), history["train_loss"], label="Train Loss", marker="o")
-    plt.plot(range(1, args.epochs + 1), history["val_loss"], label="Validation Loss", marker="o")
+    plt.plot(range(1, n_epochs_run + 1), history["train_loss"], label="Train Loss", marker="o")
+    plt.plot(range(1, n_epochs_run + 1), history["val_loss"], label="Validation Loss", marker="o")
     plt.xlabel("Epoch")
     plt.ylabel("Cross-Entropy Loss")
     plt.title("Training vs Validation Loss")
@@ -412,6 +422,10 @@ def parse_args():
     p.add_argument("--hid_dim", type=int, default=512)
     p.add_argument("--dropout", type=float, default=0.3)
     p.add_argument("--lr", type=float, default=1e-3)
+    p.add_argument("--weight_decay", type=float, default=1e-5,
+                    help="L2 regularization strength for Adam.")
+    p.add_argument("--patience", type=int, default=5,
+                    help="Stop early if val loss doesn't improve for this many epochs.")
     p.add_argument("--clip", type=float, default=1.0)
     p.add_argument("--teacher_forcing_ratio", type=float, default=0.5)
     p.add_argument("--seed", type=int, default=42)
@@ -425,9 +439,18 @@ if __name__ == "__main__":
 
     model, src_vocab, tgt_vocab = train_model(args)
 
-    # Quick sanity-check translations printed at the end of training
+    # Reload the BEST checkpoint (lowest val loss) before generating sample
+    # translations — the `model` object returned above holds the LAST epoch's
+    # weights, which may be worse than an earlier epoch if val loss rose
+    # (overfitting) later in training.
     with open(os.path.join(args.data_dir, "config.json")) as f:
         cfg = json.load(f)
+    ckpt_path = os.path.join(args.model_dir, "nmt_model.pt")
+    ckpt = torch.load(ckpt_path, map_location=DEVICE, weights_only=False)
+    model.load_state_dict(ckpt["model_state_dict"])
+    print(f"\nReloaded best checkpoint from epoch {ckpt['epoch']} "
+          f"(val_loss={ckpt['val_loss']:.4f}) for sample translations.")
+
     print("\n--- Sample translations (greedy) ---")
     for s in ["how are you today", "this is a very important meeting",
               "the government has announced a new policy for farmers"]:

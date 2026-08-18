@@ -1,0 +1,9 @@
+EN : how are you today
+OUT: आज क्या आप कैसे
+
+EN : what did you eat?
+OUT: क्या आप क्या
+
+EN : good morning?
+OUT: अच्छी अच्छा अच्छा
+
