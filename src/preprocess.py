@@ -1,7 +1,6 @@
 import re
 import unicodedata
 import pandas as pd
-from datasets import load_dataset
 from src.vocab import SOS, EOS, PAD, UNK
 
 
@@ -89,6 +88,10 @@ def load_raw_dataset(lang: str = "hi", n_samples: int = 60000) -> pd.DataFrame:
     """Streams parallel sentence pairs from AI4Bharat's Samanantar corpus via HuggingFace.
     Streaming allows fetching sample subsets without downloading multi-gigabyte files.
     """
+    # Imported locally (not at module level) so that training/inference code which
+    # imports this module (train.py, app.py) doesn't need the heavy `datasets`
+    # package installed unless it actually needs to re-download raw data.
+    from datasets import load_dataset
     raw_stream = load_dataset("ai4bharat/samanantar", lang, split="train", streaming=True)
     rows = []
     
