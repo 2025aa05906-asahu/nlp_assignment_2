@@ -1,9 +1,12 @@
 EN : how are you today
-OUT: आज क्या आप कैसे
+OUT: कैसे आप कैसे हैं?
 
-EN : what did you eat?
-OUT: क्या आप क्या
+EN : what did you eat
+OUT: क्या क्या क्या क्या
 
-EN : good morning?
+EN : good morning
 OUT: अच्छी अच्छा अच्छा
+
+EN : the government has announced a new policy for farmers
+OUT: सरकार ने किसानों को लिए नीति नीति नीति की है।
 
