@@ -1,0 +1,51 @@
+{
+  "n_test_pairs_scored": 500,
+  "n_test_pairs_total": 4873,
+  "decoding": "greedy",
+  "corpus_metrics": {
+    "BLEU": 9.15,
+    "chrF": 16.65,
+    "ROUGE-L": 23.19,
+    "METEOR": 14.91
+  },
+  "failure_analysis": {
+    "by_length": {
+      "short (<10 tok)": {
+        "n": 162,
+        "avg_chrF": 17.99
+      },
+      "medium (10-20 tok)": {
+        "n": 228,
+        "avg_chrF": 16.71
+      },
+      "long (>20 tok)": {
+        "n": 110,
+        "avg_chrF": 16.16
+      }
+    },
+    "repetition_loop_pct": 58.0,
+    "contains_unk_pct": 69.2
+  },
+  "demo_examples": [
+    {
+      "tag": "short",
+      "en": "how are you today",
+      "out": "कैसे आप कैसे हैं?"
+    },
+    {
+      "tag": "short",
+      "en": "good morning",
+      "out": "अच्छी अच्छा अच्छा"
+    },
+    {
+      "tag": "named_entity",
+      "en": "narendra modi visited the parliament in new delhi yesterday",
+      "out": "दिल्ली में दिल्ली में दिल्ली में दिल्ली"
+    },
+    {
+      "tag": "long_complex",
+      "en": "although the weather was extremely unpredictable throughout the week, the farmers who had been waiting patiently for the monsoon finally managed to sow their crops before the deadline set by the local agricultural department",
+      "out": "<unk> के <unk> के <unk> ने यह भी <unk> के लिए <unk> के लिए <unk> के लिए के लिए के लिए के लिए <unk> के लिए"
+    }
+  ]
+}
