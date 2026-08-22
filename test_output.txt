@@ -1,12 +1,12 @@
-EN : how are you today
-OUT: कैसे आप कैसे हैं?
+EN : how are you
+OUT: क्या आप कैसे हो सकते हैं?
 
 EN : what did you eat
-OUT: क्या क्या क्या क्या
+OUT: क्या आप <unk>
 
 EN : good morning
-OUT: अच्छी अच्छा अच्छा
+OUT: <unk> के लिए <unk>
 
 EN : the government has announced a new policy for farmers
-OUT: सरकार ने किसानों को लिए नीति नीति नीति की है।
+OUT: सरकार ने किसानों के लिए सरकार को किसानों की मांग को दी है।
 

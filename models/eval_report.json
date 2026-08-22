@@ -3,49 +3,49 @@
   "n_test_pairs_total": 4873,
   "decoding": "greedy",
   "corpus_metrics": {
-    "BLEU": 9.15,
-    "chrF": 16.65,
-    "ROUGE-L": 23.19,
-    "METEOR": 14.91
+    "BLEU": 13.3,
+    "chrF": 23.08,
+    "ROUGE-L": 43.47,
+    "METEOR": 20.37
   },
   "failure_analysis": {
     "by_length": {
       "short (<10 tok)": {
         "n": 162,
-        "avg_chrF": 17.99
+        "avg_chrF": 21.43
       },
       "medium (10-20 tok)": {
         "n": 228,
-        "avg_chrF": 16.71
+        "avg_chrF": 23.66
       },
       "long (>20 tok)": {
         "n": 110,
-        "avg_chrF": 16.16
+        "avg_chrF": 22.81
       }
     },
-    "repetition_loop_pct": 58.0,
-    "contains_unk_pct": 69.2
+    "repetition_loop_pct": 0.0,
+    "contains_unk_pct": 91.6
   },
   "demo_examples": [
     {
       "tag": "short",
       "en": "how are you today",
-      "out": "कैसे आप कैसे हैं?"
+      "out": "आप कैसे <unk>"
     },
     {
       "tag": "short",
       "en": "good morning",
-      "out": "अच्छी अच्छा अच्छा"
+      "out": "<unk> के लिए <unk>"
     },
     {
       "tag": "named_entity",
       "en": "narendra modi visited the parliament in new delhi yesterday",
-      "out": "दिल्ली में दिल्ली में दिल्ली में दिल्ली"
+      "out": "दिल्ली में नई दिल्ली में पीएम मोदी को दिल्ली"
     },
     {
       "tag": "long_complex",
       "en": "although the weather was extremely unpredictable throughout the week, the farmers who had been waiting patiently for the monsoon finally managed to sow their crops before the deadline set by the local agricultural department",
-      "out": "<unk> के <unk> के <unk> ने यह भी <unk> के लिए <unk> के लिए <unk> के लिए के लिए के लिए के लिए <unk> के लिए"
+      "out": "<unk> के बाद <unk> में सबसे बड़ी <unk> के लिए <unk> ने बाद में <unk> के में <unk> की थी और <unk> के समय तक <unk> के की <unk> के साथ ही <unk>"
     }
   ]
 }

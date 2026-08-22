@@ -183,7 +183,15 @@ class Seq2Seq(nn.Module):
         return outputs
 
     @torch.no_grad()
-    def greedy_decode(self, src, src_lens, max_len=34):
+    def greedy_decode(self, src, src_lens, max_len=34, no_repeat_ngram_size=3):
+        """
+        no_repeat_ngram_size: if >0, block any token that would complete an
+        n-gram already generated in this sequence. This is a standard decoding
+        constraint (used e.g. in Hugging Face's generate()) for suppressing the
+        "word word word" repetition loops that undertrained/small-data seq2seq
+        models are prone to. It only restricts the search at decode time - it
+        does not change the trained model or its probabilities.
+        """
         self.eval()
         encoder_outputs, hidden, cell = self.encoder(src, src_lens)
         mask = self.make_mask(src)
@@ -193,6 +201,24 @@ class Seq2Seq(nn.Module):
         finished = [False] * src.size(0)
         for _ in range(max_len):
             pred, hidden, cell, _ = self.decoder(input_tok, hidden, cell, encoder_outputs, mask)
+            if no_repeat_ngram_size > 0:
+                for i in range(src.size(0)):
+                    seq = results[i]
+                    # Hard rule: never immediately repeat the token just generated,
+                    # and never recreate a short alternating cycle (A B A B...).
+                    for period in (1, 2):
+                        if len(seq) >= period:
+                            pred[i, seq[-period]] = float("-inf")
+                    n = no_repeat_ngram_size
+                    if len(seq) >= n - 1:
+                        prefix = tuple(seq[-(n - 1):]) if n > 1 else ()
+                        banned = {
+                            seq[j + n - 1]
+                            for j in range(len(seq) - n + 1)
+                            if tuple(seq[j:j + n - 1]) == prefix
+                        }
+                        for tok in banned:
+                            pred[i, tok] = float("-inf")
             top1 = pred.argmax(1)
             for i in range(src.size(0)):
                 if not finished[i]:
@@ -207,7 +233,8 @@ class Seq2Seq(nn.Module):
         return results
 
     @torch.no_grad()
-    def beam_search_decode(self, src, src_lens, beam_width=5, max_len=34, len_norm=0.7):
+    def beam_search_decode(self, src, src_lens, beam_width=5, max_len=34, len_norm=0.7,
+                             no_repeat_ngram_size=3):
         """Beam search for a SINGLE sentence (src batch size must be 1)."""
         self.eval()
         assert src.size(0) == 1, "beam_search_decode expects a batch of size 1"
@@ -217,6 +244,23 @@ class Seq2Seq(nn.Module):
         # Each beam: (token_sequence, hidden, cell, log_prob, finished)
         beams = [([self.sos_idx], hidden, cell, 0.0, False)]
 
+        def banned_tokens(seq, n):
+            banned = set()
+            # Hard rule: never immediately repeat the token just generated, and
+            # never recreate a short alternating cycle (A B A B...).
+            for period in (1, 2):
+                if len(seq) >= period:
+                    banned.add(seq[-period])
+            if n <= 0 or len(seq) < n - 1:
+                return banned
+            prefix = tuple(seq[-(n - 1):]) if n > 1 else ()
+            banned |= {
+                seq[j + n - 1]
+                for j in range(len(seq) - n + 1)
+                if tuple(seq[j:j + n - 1]) == prefix
+            }
+            return banned
+
         for _ in range(max_len):
             candidates = []
             for seq, h, c, score, finished in beams:
@@ -225,6 +269,8 @@ class Seq2Seq(nn.Module):
                     continue
                 input_tok = torch.tensor([seq[-1]], dtype=torch.long, device=self.device)
                 pred, h_new, c_new, _ = self.decoder(input_tok, h, c, encoder_outputs, mask)
+                for tok in banned_tokens(seq, no_repeat_ngram_size):
+                    pred[0, tok] = float("-inf")
                 log_probs = F.log_softmax(pred, dim=1).squeeze(0)  # [vocab]
                 topk_logp, topk_idx = log_probs.topk(beam_width)
                 for lp, idx in zip(topk_logp.tolist(), topk_idx.tolist()):
@@ -319,16 +365,50 @@ def train_model(args):
         emb_dim=args.emb_dim, hid_dim=args.hid_dim, dropout=args.dropout,
     )
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
-    criterion = nn.CrossEntropyLoss(ignore_index=pad_idx)
+    # label_smoothing softens the target distribution so the model isn't pushed
+    # to put ~100% probability on a single token; this alone noticeably reduces
+    # the "same token repeated forever" collapse mode on small NMT datasets.
+    criterion = nn.CrossEntropyLoss(ignore_index=pad_idx, label_smoothing=args.label_smoothing)
+    # Halve the LR whenever val loss stops improving for 2 epochs, instead of
+    # just letting it overfit at a constant LR until early stopping kicks in.
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer, mode="min", factor=0.5, patience=2
+    )
+
+    ckpt_path = os.path.join(args.model_dir, "nmt_model.pt")
+    start_epoch = 1
+    best_val_loss = float("inf")
+    history = {"train_loss": [], "val_loss": []}
+    epochs_no_improve = 0
+
+    if args.resume:
+        if not os.path.exists(ckpt_path):
+            raise SystemExit(f"--resume was passed but no checkpoint found at {ckpt_path}")
+        ckpt = torch.load(ckpt_path, map_location=DEVICE, weights_only=False)
+        model.load_state_dict(ckpt["model_state_dict"])
+        best_val_loss = ckpt["val_loss"]
+        start_epoch = ckpt["epoch"] + 1
+        log_path = os.path.join(args.model_dir, "training_log.json")
+        if os.path.exists(log_path):
+            with open(log_path) as f:
+                history = json.load(f)["history"]
+        # Seed the scheduler's notion of "best" with the checkpoint's real best
+        # val loss. Without this, a fresh scheduler thinks epoch 16 onward is
+        # "improving" as long as each epoch beats the *previous* epoch, even if
+        # every one of them is worse than the actual best - so it never fires.
+        scheduler.step(best_val_loss)
+        print(f"Resuming from epoch {ckpt['epoch']} (val_loss={best_val_loss:.4f}). "
+              f"Will train epochs {start_epoch}..{args.epochs}.")
+        if start_epoch > args.epochs:
+            raise SystemExit(
+                f"Checkpoint is already at epoch {ckpt['epoch']}, which is >= "
+                f"--epochs {args.epochs}. Pass a larger --epochs to continue training."
+            )
 
     print(f"Device: {DEVICE} | Src vocab: {len(src_vocab)} | Tgt vocab: {len(tgt_vocab)}")
     print(f"Train batches: {len(train_loader)} | Val batches: {len(val_loader)}")
 
-    history = {"train_loss": [], "val_loss": []}
-    best_val_loss = float("inf")
-    epochs_no_improve = 0
-
-    for epoch in range(1, args.epochs + 1):
+    for epoch in range(start_epoch, args.epochs + 1):
         start = time.time()
         train_loss = run_epoch(model, train_loader, optimizer, criterion, pad_idx,
                                 clip=args.clip, train=True,
@@ -339,9 +419,11 @@ def train_model(args):
 
         history["train_loss"].append(train_loss)
         history["val_loss"].append(val_loss)
+        scheduler.step(val_loss)
+        current_lr = optimizer.param_groups[0]["lr"]
         print(f"Epoch {epoch:02d}/{args.epochs} | "
               f"Train Loss: {train_loss:.4f} | Val Loss: {val_loss:.4f} | "
-              f"Time: {elapsed:.1f}s")
+              f"LR: {current_lr:.2e} | Time: {elapsed:.1f}s")
 
         if val_loss < best_val_loss:
             best_val_loss = val_loss
@@ -418,17 +500,32 @@ def parse_args():
     p.add_argument("--model_dir", type=str, default="models")
     p.add_argument("--epochs", type=int, default=15)
     p.add_argument("--batch_size", type=int, default=128)
-    p.add_argument("--emb_dim", type=int, default=256)
-    p.add_argument("--hid_dim", type=int, default=512)
-    p.add_argument("--dropout", type=float, default=0.3)
+    p.add_argument("--emb_dim", type=int, default=128,
+                    help="Reduced from 256: too large for a ~39k-pair corpus.")
+    p.add_argument("--hid_dim", type=int, default=256,
+                    help="Reduced from 512: the old value made the decoder's "
+                         "output layer alone ~38M params, dwarfing the training "
+                         "set and causing near-instant overfitting.")
+    p.add_argument("--dropout", type=float, default=0.4,
+                    help="Raised from 0.3 to fight overfitting on the smaller data budget.")
     p.add_argument("--lr", type=float, default=1e-3)
-    p.add_argument("--weight_decay", type=float, default=1e-5,
-                    help="L2 regularization strength for Adam.")
-    p.add_argument("--patience", type=int, default=5,
+    p.add_argument("--weight_decay", type=float, default=1e-4,
+                    help="Raised from 1e-5: stronger L2 regularization.")
+    p.add_argument("--label_smoothing", type=float, default=0.1,
+                    help="Softens targets; reduces repetition-loop collapse.")
+    p.add_argument("--patience", type=int, default=4,
                     help="Stop early if val loss doesn't improve for this many epochs.")
     p.add_argument("--clip", type=float, default=1.0)
-    p.add_argument("--teacher_forcing_ratio", type=float, default=0.5)
+    p.add_argument("--teacher_forcing_ratio", type=float, default=0.6,
+                    help="Slightly reduced from 0.8 used in your last run, so the "
+                         "model sees more of its own (imperfect) predictions during "
+                         "training and doesn't rely so heavily on ground-truth tokens "
+                         "it won't have at inference time.")
     p.add_argument("--seed", type=int, default=42)
+    p.add_argument("--resume", action="store_true",
+                    help="Resume training from ./<model_dir>/nmt_model.pt instead of "
+                         "starting a fresh model. Continues counting epochs from where "
+                         "the checkpoint left off, up to --epochs.")
     return p.parse_args()
 
 

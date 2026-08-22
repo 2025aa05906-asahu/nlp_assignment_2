@@ -11,9 +11,24 @@ from src.preprocess import (
     encode_and_pad
 )
 
+import argparse
+
 LANG = "hi"          # Target Indian language code
 N_SAMPLES = 60_000   # Raw sample download target
 MAX_LEN = 34         # Fixed sequence length (30 tokens + <sos> + <eos> + padding buffer)
+
+
+def parse_args():
+    p = argparse.ArgumentParser(description="Task 2 - Data pipeline")
+    p.add_argument("--min_freq", type=int, default=4,
+                    help="Minimum token frequency to enter the vocabulary. "
+                         "Raising this (from the old default of 2) shrinks the "
+                         "vocab a lot on a ~39k-sentence corpus, which is what "
+                         "you want: fewer rare/singleton tokens for the model "
+                         "to have to learn, less <unk> at inference time, and "
+                         "a much smaller (cheaper, less overfitting-prone) "
+                         "output softmax layer.")
+    return p.parse_args()
 
 
 def main():
@@ -21,6 +36,7 @@ def main():
 
     train/val/test splitting, and artifact saving pipeline.
     """
+    args = parse_args()
     # Ensure reproducible data splits across runs
     random.seed(42)
     os.makedirs("data", exist_ok=True)
@@ -45,8 +61,8 @@ def main():
 
     # Step 4: Build vocabularies exclusively from training split (prevents test data leakage)
     print("[4/5] Building source and target vocabularies...")
-    src_vocab = Vocab(min_freq=2).build(train_df["en_tokens"])
-    tgt_vocab = Vocab(min_freq=2).build(train_df["tgt_tokens"])
+    src_vocab = Vocab(min_freq=args.min_freq).build(train_df["en_tokens"])
+    tgt_vocab = Vocab(min_freq=args.min_freq).build(train_df["tgt_tokens"])
 
     # Step 5: Encode text into padded integer ID sequences and save artifacts to disk
     print("[5/5] Encoding, padding, and saving artifacts to ./data/...")
