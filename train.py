@@ -204,11 +204,13 @@ class Seq2Seq(nn.Module):
             if no_repeat_ngram_size > 0:
                 for i in range(src.size(0)):
                     seq = results[i]
-                    # Hard rule: never immediately repeat the token just generated,
-                    # and never recreate a short alternating cycle (A B A B...).
-                    for period in (1, 2):
-                        if len(seq) >= period:
-                            pred[i, seq[-period]] = float("-inf")
+                    # Hard rule: never immediately repeat the token just generated.
+                    # This is the actual failure mode seen in practice (e.g. "kaise
+                    # kaise") - it's a 2-token pattern, which no_repeat_ngram_size=3
+                    # alone does not catch (that only blocks a 3-token pattern from
+                    # recurring later in the sequence).
+                    if len(seq) >= 1:
+                        pred[i, seq[-1]] = float("-inf")
                     n = no_repeat_ngram_size
                     if len(seq) >= n - 1:
                         prefix = tuple(seq[-(n - 1):]) if n > 1 else ()
@@ -246,11 +248,9 @@ class Seq2Seq(nn.Module):
 
         def banned_tokens(seq, n):
             banned = set()
-            # Hard rule: never immediately repeat the token just generated, and
-            # never recreate a short alternating cycle (A B A B...).
-            for period in (1, 2):
-                if len(seq) >= period:
-                    banned.add(seq[-period])
+            # Hard rule: never immediately repeat the token just generated.
+            if len(seq) >= 1:
+                banned.add(seq[-1])
             if n <= 0 or len(seq) < n - 1:
                 return banned
             prefix = tuple(seq[-(n - 1):]) if n > 1 else ()
