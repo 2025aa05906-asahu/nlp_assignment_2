@@ -39,7 +39,7 @@ nlp_assignment_2/
 ├── run_pipeline.py        # Complete Data Pipeline Execution Script (Task 2)
 ├── train.py               # Model Training & Loss Tracking Script (Task 3)
 ├── app.py                 # Streamlit Web Application Interface (Task 4)
-├── requirements.txt       # Dependencies with fixed versions
+├── requirements.txt       # project dependencies
 ├── .gitignore             # Git exclusion rules
 └── README.md              # Setup and execution guide
 ```
@@ -78,7 +78,7 @@ The project includes a Streamlit web application for English-to-Hindi translatio
 
 ### **Running the Application**
 
-Make sure Python 3.12 is installed.
+Make sure Python 3.12 or later is installed.
 
 Create and activate a virtual environment:
 
@@ -161,8 +161,6 @@ The model may occasionally generate `<unk>` tokens or repeated words/phrases. Th
 For a fresh local setup, follow these steps:
 
 ```bash
-git clone <repository-url>
-cd nlp_assignment_2
 python -m venv .venv
 ```
 
