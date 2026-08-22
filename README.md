@@ -118,21 +118,22 @@ Features:
 
 ```
 data/
-    config.json          sequence length and vocabulary size metadata
-    src_vocab.json        English vocabulary
-    tgt_vocab.json         Hindi vocabulary
-    train.csv / val.csv / test.csv          raw text splits
-    train_ids.json / val_ids.json / test_ids.json    encoded, padded ID matrices
-samanantar_en_hi_raw_60k.csv    raw pre-cleaning data pull, kept for traceability, not read at runtime
+    config.json          sequence length and vocabulary size metadata          [included]
+    src_vocab.json        English vocabulary                                   [included]
+    tgt_vocab.json         Hindi vocabulary                                    [included]
+    train.csv / val.csv / test.csv          raw text splits                    [regenerate: run_pipeline.py]
+    train_ids.json / val_ids.json / test_ids.json    encoded, padded ID matrices  [regenerate: run_pipeline.py]
+samanantar_en_hi_raw_60k.csv    raw pre-cleaning data pull                     [regenerate: run_pipeline.py]
 src/
-    vocab.py               vocabulary class
-    preprocess.py            cleaning, tokenization, encoding
+    vocab.py               vocabulary class                                    [included]
+    preprocess.py            cleaning, tokenization, encoding                  [included]
 models/
-    nmt_model.pt            trained checkpoint, epoch 20, val loss 5.8715
-    loss_curve.png            training and validation loss plot
-    training_log.json          hyperparameters and per-epoch loss history
-    eval_report.json           BLEU, chrF, ROUGE-L, METEOR and failure analysis
+    nmt_model.pt            trained checkpoint, epoch 20, val loss 5.8715      [download: download_model.py]
+    loss_curve.png            training and validation loss plot                [included]
+    training_log.json          hyperparameters and per-epoch loss history      [included]
+    eval_report.json           BLEU, chrF, ROUGE-L, METEOR and failure analysis [included]
 run_pipeline.py            data download, cleaning, split, vocabulary build, encoding
+download_model.py          fetches the trained checkpoint from Hugging Face Hub
 train.py                    model definition, training loop, greedy and beam decoding
 infer.py                    command line inference from a saved checkpoint
 evaluate.py                  evaluation metrics and failure mode analysis
@@ -141,6 +142,8 @@ test_input.txt / test_output.txt      sample batch input and output
 requirements.txt
 README.md
 ```
+
+Files marked `[regenerate: run_pipeline.py]` or `[download: download_model.py]` are not physically present in `Group112_Code.zip` — the ZIP stays under the assignment's 10 MB upload limit, and these two scripts recreate everything needed on the evaluator's machine.
 
 ## Setup instructions
 
@@ -166,20 +169,24 @@ pip install -r requirements.txt
 ```
 
 ### 4. Place the dataset and model files
-`data/` and `models/` already contain everything required to run the application: the preprocessed vocabularies, encoded splits, and the trained checkpoint `models/nmt_model.pt`. No download or training step is required before launching the app. No manual file placement is needed, everything is already at the expected paths.
-
-To regenerate the data from scratch instead of using the included files, run:
+`data/` already contains the preprocessed vocabularies and metadata needed to run the application (`src_vocab.json`, `tgt_vocab.json`, `config.json`). The encoded train/val/test ID matrices and raw CSV splits are **not** included in this ZIP (they're regenerable and would otherwise push the ZIP well over the assignment's 10 MB upload limit) — regenerate them with:
 ```bash
 python run_pipeline.py --min_freq 4
 ```
-This downloads the Samanantar corpus from Hugging Face and requires internet access.
+This downloads the Samanantar corpus from Hugging Face and requires internet access. Only needed if you plan to retrain; not needed to run the app or CLI inference.
 
-To retrain or continue training the model instead of using the included checkpoint:
+The trained checkpoint `models/nmt_model.pt` (54 MB) is likewise excluded from the ZIP for the same size-limit reason. Download the exact checkpoint used for this submission with:
+```bash
+python download_model.py
+```
+This fetches `nmt_model.pt` from Hugging Face Hub and verifies its SHA-256 hash against the checkpoint referenced in `models/training_log.json` / `models/eval_report.json`, so you get the real, submitted weights rather than a fresh (and likely numerically different) retrain. Requires internet access; no GPU needed for this step; takes under a minute.
+
+Alternatively, to retrain instead of downloading:
 ```bash
 python train.py
 python train.py --resume --epochs 60 --lr 5e-4 --patience 6
 ```
-The included checkpoint was produced with the second command, resumed from an initial run.
+This reproduces a comparable checkpoint but will not be bit-for-bit identical, and takes roughly 15–45 minutes on GPU across both phases.
 
 ### 5. Launch the application
 ```bash
