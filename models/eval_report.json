@@ -3,28 +3,28 @@
   "n_test_pairs_total": 4492,
   "decoding": "greedy",
   "corpus_metrics": {
-    "BLEU": 17.09,
-    "chrF": 22.66,
-    "ROUGE-L": 35.17,
-    "METEOR": 20.77
+    "BLEU": 14.6,
+    "chrF": 23.03,
+    "ROUGE-L": 40.44,
+    "METEOR": 20.51
   },
   "failure_analysis": {
     "by_length": {
       "short (<10 tok)": {
         "n": 157,
-        "avg_chrF": 22.81
+        "avg_chrF": 23.03
       },
       "medium (10-20 tok)": {
         "n": 268,
-        "avg_chrF": 23.11
+        "avg_chrF": 23.64
       },
       "long (>20 tok)": {
         "n": 75,
-        "avg_chrF": 22.69
+        "avg_chrF": 22.58
       }
     },
     "repetition_loop_pct": 0.0,
-    "contains_unk_pct": 88.2
+    "contains_unk_pct": 88.8
   },
   "demo_examples": [
     {
@@ -45,7 +45,7 @@
     {
       "tag": "long_complex",
       "en": "although the weather was extremely unpredictable throughout the week, the farmers who had been waiting patiently for the monsoon finally managed to sow their crops before the deadline set by the local agricultural department",
-      "out": "<unk> के <unk> <unk> ने <unk> <unk> को <unk> <unk> कर दिया था कि वे <unk> द्वारा <unk> <unk> द्वारा कर दिया गया"
+      "out": "<unk> के <unk> ने <unk> के पास <unk> ने कहा कि <unk> को <unk> कर दिया था कि वे <unk> द्वारा <unk> द्वारा कर दिया गया"
     }
   ]
 }

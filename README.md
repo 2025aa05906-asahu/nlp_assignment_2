@@ -52,7 +52,7 @@ Implemented in `src/preprocess.py` and `run_pipeline.py`:
 * **Loss:** Token level cross entropy with label smoothing 0.1, ignoring `<pad>` positions.
 * **Regularization:** dropout 0.4, weight decay 1e-4, gradient clipping at max norm 1.0.
 * **LR schedule:** `ReduceLROnPlateau`, factor 0.5, patience 2.
-* **Decoding:** Both greedy decoding and beam search (configurable beam width, length-normalized scoring), implemented in `train.py`. A no-repeat constraint blocks the model from repeating its immediately preceding token and applies a no-repeat-trigram rule during decoding.
+* **Decoding:** Both greedy decoding and beam search (configurable beam width, length-normalized scoring), implemented in `train.py`. A no-repeat constraint blocks the model from repeating its immediately preceding token, plus a no-repeat-trigram rule during decoding. This removes back-to-back duplicate tokens (for example "government government") but does not prevent the same word from recurring at non-adjacent positions in a longer sentence, which is a separate, model-quality-driven failure mode rather than a decoding artifact. It also occasionally suppresses grammatically valid Hindi reduplication (for example "slowly slowly"), which is a known trade-off (see Evaluation).
 
 ### Training configuration used for the submitted checkpoint
 * Batch size: 128
@@ -74,21 +74,22 @@ Scored on 500 of 4,492 test pairs, greedy decoding. Results in `models/eval_repo
 
 | Metric | Score |
 |---|---|
-| BLEU | 17.09 |
-| chrF | 22.66 |
-| ROUGE-L | 35.17 |
-| METEOR | 20.77 |
+| BLEU | 14.60 |
+| chrF | 23.03 |
+| ROUGE-L | 40.44 |
+| METEOR | 20.51 |
 
 Failure analysis by sentence length:
 
 | Length bucket | n | avg chrF |
 |---|---|---|
-| Short, under 10 tokens | 157 | 22.81 |
-| Medium, 10 to 20 tokens | 268 | 23.11 |
-| Long, over 20 tokens | 75 | 22.69 |
+| Short, under 10 tokens | 157 | 23.03 |
+| Medium, 10 to 20 tokens | 268 | 23.64 |
+| Long, over 20 tokens | 75 | 22.58 |
 
-* Repetition-loop rate: 0.0 percent, on this sample the decode-time repetition blocking eliminated repeated-token loops entirely.
-* Outputs containing at least one `<unk>` token: 88.2 percent. This is the model's dominant failure mode.
+* Repetition-loop rate (3+ identical consecutive tokens): 0.0 percent on this sample. Note this metric only flags a token repeated three or more times in a row. It does not capture the same word recurring at non-adjacent positions in a sentence, which is still observed (see sample outputs below, "government" recurring four times in one output).
+* The decode-time constraint blocks any single immediate repeat of a token, which eliminates back-to-back duplicate loops but has a measurable cost: BLEU dropped from an earlier, more permissive version of the constraint (17.09 to 14.60), while chrF and ROUGE-L improved, because Hindi has grammatically valid reduplication (for example "slowly slowly") that the stricter constraint occasionally blocks along with genuine degenerate loops. This trade-off was accepted in favor of cleaner, less repetitive output.
+* Outputs containing at least one `<unk>` token: 88.8 percent. This is the model's dominant failure mode.
 * Named entities (for example person and place names such as "Narendra Modi", "New Delhi") are frequently mistranslated, dropped or repeated incorrectly.
 * Long, multi-clause sentences produce degraded, partially incoherent output with a high concentration of `<unk>` tokens, consistent with the chrF trend above.
 * Rare words not covered by the `min_freq=4` vocabulary are mapped to `<unk>` at both training and inference time.
@@ -98,8 +99,9 @@ Sample demonstration outputs (from `models/eval_report.json`):
 | Type | English | Hindi output |
 |---|---|---|
 | Short | how are you today | kaise aap kya kar rahe hain |
-| Named entity | narendra modi visited the parliament in new delhi yesterday | dilli mein dilli ke naye dilli mein nai dilli |
+| Named entity | narendra modi visited the parliament in new delhi yesterday | dilli mein dilli ke naye dilli mein nai dilli, incorrect, repeats "delhi" instead of resolving the named entity |
 | Long/complex | although the weather was extremely unpredictable throughout the week, the farmers who had been waiting patiently for the monsoon finally managed to sow their crops before the deadline set by the local agricultural department | largely `<unk>` tokens interspersed with partial fragments, see eval_report.json for the exact output |
+| Scattered repetition example | the government has announced a new policy for farmers | sarkar ne kisanon sarkar kisanon sarkar ki sarkar ki hai, "government" (sarkar) recurs four times at non-adjacent positions despite no 3-in-a-row loop, illustrating the gap the repetition_loop_pct metric does not catch |
 
 ## Application
 

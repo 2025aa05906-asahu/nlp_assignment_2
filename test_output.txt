@@ -2,11 +2,11 @@ EN : how are you
 OUT: कैसे आप क्या कर रहे हैं?
 
 EN : what did you eat
-OUT: क्या क्या <unk> क्या क्या है?
+OUT: क्या आप क्या कर रहे हैं?
 
 EN : good morning
 OUT: <unk> के लिए <unk>
 
 EN : the government has announced a new policy for farmers
-OUT: सरकार सरकार ने किसानों सरकार सरकार की सरकार की है।
+OUT: सरकार ने किसानों सरकार किसानों सरकार की सरकार की है।
 

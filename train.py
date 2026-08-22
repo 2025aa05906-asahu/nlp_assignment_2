@@ -198,9 +198,8 @@ class Seq2Seq(nn.Module):
             if no_repeat_ngram_size > 0:
                 for i in range(src.size(0)):
                     seq = results[i]
-                    # Block a third consecutive copy while allowing two-token
-                    # reduplication patterns.
-                    if len(seq) >= 2 and seq[-1] == seq[-2]:
+                    # Block any immediate repeat of the previous token.
+                    if len(seq) >= 1:
                         pred[i, seq[-1]] = float("-inf")
                     n = no_repeat_ngram_size
                     if len(seq) >= n - 1:
@@ -239,8 +238,8 @@ class Seq2Seq(nn.Module):
 
         def banned_tokens(seq, n):
             banned = set()
-            # Block a third consecutive copy while allowing two-token repetition.
-            if len(seq) >= 2 and seq[-1] == seq[-2]:
+            # Block any immediate repeat of the previous token.
+            if len(seq) >= 1:
                 banned.add(seq[-1])
             if n <= 0 or len(seq) < n - 1:
                 return banned
