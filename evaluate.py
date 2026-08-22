@@ -5,11 +5,11 @@ split (data/test_ids.json), generates translations, and reports:
   1. Corpus-level automatic metrics: BLEU, chrF, ROUGE-L, METEOR
   2. A qualitative demo on a curated set of sample sentences, including at
      least one long/complex sentence (printed + saved so it can be
-     screenshotted / pasted into the report)
+    inspected alongside the computed metrics)
   3. A programmatic failure-mode analysis: performance by sentence length,
      repetition-loop detection, and OOV(<unk>)/rare-word impact — these are
      the "rare words / named entities / long sentences / word-order" angles
-     the assignment brief asks for.
+    including rare words, named entities, long sentences, and word order.
 """
 
 import argparse
@@ -24,9 +24,7 @@ from infer import load_model
 from src.vocab import PAD, SOS, EOS, UNK
 
 
-# --------------------------------------------------------------------------- #
-# Metric imports (each optional so one missing package doesn't kill the run)
-# --------------------------------------------------------------------------- #
+# Import available metric implementations independently.
 def _try_import_metrics():
     metrics = {}
     try:
@@ -59,9 +57,7 @@ def _try_import_metrics():
     return metrics
 
 
-# --------------------------------------------------------------------------- #
-# Reconstruct raw text from the pre-encoded, pre-padded test_ids.json
-# --------------------------------------------------------------------------- #
+# Reconstruct token text from the encoded test sequences.
 def decode_ids_to_text(ids, vocab):
     toks = vocab.decode(ids)
     toks = [t for t in toks if t not in (PAD, SOS, EOS)]
@@ -86,9 +82,7 @@ def load_test_pairs(data_dir, src_vocab, tgt_vocab, n_samples=None, seed=42):
     return pairs, n_total
 
 
-# --------------------------------------------------------------------------- #
-# Corpus-level metrics
-# --------------------------------------------------------------------------- #
+# Compute corpus-level translation metrics.
 def compute_corpus_metrics(hyps, refs, metrics):
     results = {}
 
@@ -110,9 +104,7 @@ def compute_corpus_metrics(hyps, refs, metrics):
     return results
 
 
-# --------------------------------------------------------------------------- #
-# Failure-mode analysis
-# --------------------------------------------------------------------------- #
+# Compute length, repetition, and unknown-token statistics.
 def has_repetition_loop(tokens, min_run=3):
     """Flags the 'क्या क्या क्या' style collapse: the same token repeated
     min_run+ times in a row anywhere in the hypothesis."""
@@ -172,9 +164,7 @@ def failure_analysis(pairs, hyps, metrics):
     }
 
 
-# --------------------------------------------------------------------------- #
-# Qualitative demo set (Task 5: "at least one long or complex sentence")
-# --------------------------------------------------------------------------- #
+# Representative examples covering short, named-entity, and complex inputs.
 DEMO_SENTENCES = [
     ("short", "how are you today"),
     ("short", "good morning"),
@@ -188,7 +178,7 @@ DEMO_SENTENCES = [
 
 
 def run_demo(model, src_vocab, tgt_vocab, max_len, decoding, beam_width):
-    print("\n--- Qualitative demo (for Task 5 screenshots / report) ---")
+    print("\n--- Qualitative translation examples ---")
     demo_results = []
     for tag, sentence in DEMO_SENTENCES:
         out = translate_sentence(model, sentence, src_vocab, tgt_vocab, max_len,
@@ -200,9 +190,8 @@ def run_demo(model, src_vocab, tgt_vocab, max_len, decoding, beam_width):
     return demo_results
 
 
-# --------------------------------------------------------------------------- #
 def parse_args():
-    p = argparse.ArgumentParser(description="Task 5 - Evaluation (metrics + failure analysis)")
+    p = argparse.ArgumentParser(description="Evaluate translations and analyze failure modes")
     p.add_argument("--data_dir", type=str, default="data")
     p.add_argument("--model_dir", type=str, default="models")
     p.add_argument("--n_samples", type=int, default=500,

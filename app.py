@@ -1,7 +1,5 @@
 """
-Task 4 - Application Development
-----------------------------------
-A Streamlit web app for the English -> Hindi NMT system. Reuses the same
+English-to-Hindi neural machine translation web application. Reuses the same
 model-loading and translation logic as infer.py / evaluate.py so behavior
 stays consistent everywhere.
 
@@ -21,9 +19,7 @@ from train import load_vocab, translate_sentence, DEVICE
 from infer import load_model
 
 
-# --------------------------------------------------------------------------- #
-# Model loading (cached so it only happens once per session, not per click)
-# --------------------------------------------------------------------------- #
+# Cache model and vocabulary objects for the Streamlit session.
 @st.cache_resource
 def get_model_and_vocabs(data_dir="data", model_dir="models"):
     src_vocab = load_vocab(os.path.join(data_dir, "src_vocab.json"))
@@ -65,9 +61,7 @@ with st.sidebar:
 
 tab_single, tab_batch = st.tabs(["✍️ Single sentence", "📄 Batch (file upload)"])
 
-# --------------------------------------------------------------------------- #
-# Tab 1: single-sentence text input
-# --------------------------------------------------------------------------- #
+# Single-sentence translation interface.
 with tab_single:
     st.subheader("Translate a sentence")
     default_example = "although the weather was extremely unpredictable throughout the week, the farmers finally managed to sow their crops"
@@ -94,9 +88,7 @@ with tab_single:
                 st.markdown("**Translation (Hindi)**")
                 st.success(output)
 
-# --------------------------------------------------------------------------- #
-# Tab 2: batch translation via .txt / .csv upload
-# --------------------------------------------------------------------------- #
+# Batch translation interface for text and CSV uploads.
 with tab_batch:
     st.subheader("Batch translate from a file")
     st.caption(

@@ -22,11 +22,8 @@ def load_model(model_dir="models"):
     ckpt = torch.load(ckpt_path, map_location=DEVICE, weights_only=False)
     hp = ckpt["hyperparameters"]
 
-    # FIX3: build_model now needs src_pad_idx AND tgt_pad_idx separately.
-    # ckpt.get(..., fallback) keeps this working on OLD checkpoints saved
-    # before the fix (which only stored "pad_idx", using it for both sides) --
-    # but if you're loading such a checkpoint, retrain so it's saved with a
-    # correct, separate tgt_pad_idx instead of relying on this fallback.
+    # Read separate source and target padding indices when available.
+    # The fallback supports checkpoints that contain only the source index.
     src_pad_idx = ckpt["pad_idx"]
     tgt_pad_idx = ckpt.get("tgt_pad_idx", ckpt["pad_idx"])
 

@@ -1,9 +1,7 @@
 """
-Task 3 - Model Development
----------------------------
 Trains an Encoder-Decoder (BiLSTM + Bahdanau Attention) Neural Machine
 Translation model on the preprocessed English -> Indian-language corpus
-produced by run_pipeline.py (Task 2), and exposes greedy / beam-search
+produced by run_pipeline.py, and exposes greedy / beam-search
 decoding for inference.
 
 Usage:
@@ -36,9 +34,7 @@ from src.vocab import Vocab, PAD, SOS, EOS, UNK
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-# --------------------------------------------------------------------------- #
-# Data loading
-# --------------------------------------------------------------------------- #
+# Data loading and vocabulary reconstruction.
 class NMTDataset(Dataset):
     """Wraps pre-encoded, pre-padded (src, tgt) integer-ID sequences produced
     by run_pipeline.py so they can be fed straight into a DataLoader."""
@@ -66,9 +62,7 @@ def load_vocab(path: str) -> Vocab:
     return v
 
 
-# --------------------------------------------------------------------------- #
-# Model: BiLSTM Encoder + Bahdanau-Attention LSTM Decoder
-# --------------------------------------------------------------------------- #
+# BiLSTM encoder and Bahdanau-attention LSTM decoder.
 class Encoder(nn.Module):
     def __init__(self, vocab_size, emb_dim, hid_dim, n_layers=1, dropout=0.2, pad_idx=0):
         super().__init__()
@@ -204,11 +198,8 @@ class Seq2Seq(nn.Module):
             if no_repeat_ngram_size > 0:
                 for i in range(src.size(0)):
                     seq = results[i]
-                    # FIX2: Only ban a token if it would be the 3rd consecutive
-                    # repeat (seq[-1] == seq[-2] means we've already got a pair;
-                    # banning seq[-1] again stops a 3rd). This still allows
-                    # legitimate single reduplication in Hindi (e.g. dhire-dhire,
-                    # baar-baar) while blocking runaway "word word word" loops.
+                    # Block a third consecutive copy while allowing two-token
+                    # reduplication patterns.
                     if len(seq) >= 2 and seq[-1] == seq[-2]:
                         pred[i, seq[-1]] = float("-inf")
                     n = no_repeat_ngram_size
@@ -248,7 +239,7 @@ class Seq2Seq(nn.Module):
 
         def banned_tokens(seq, n):
             banned = set()
-            # FIX2: Only ban a 3rd consecutive repeat; allow single reduplication.
+            # Block a third consecutive copy while allowing two-token repetition.
             if len(seq) >= 2 and seq[-1] == seq[-2]:
                 banned.add(seq[-1])
             if n <= 0 or len(seq) < n - 1:
@@ -293,11 +284,7 @@ class Seq2Seq(nn.Module):
         return best_seq
 
 
-# FIX3: build_model now takes SEPARATE src_pad_idx and tgt_pad_idx, and routes
-# each to the correct submodule (Encoder gets src_pad_idx, Decoder gets
-# tgt_pad_idx). Previously a single `pad_idx` (really the SOURCE vocab's pad
-# id) was used for both encoder and decoder embeddings, which only worked
-# because both vocabs coincidentally place PAD at index 0.
+# Use the source and target padding indices for their respective submodules.
 def build_model(src_vocab_size, tgt_vocab_size, src_pad_idx, tgt_pad_idx, sos_idx, eos_idx,
                  emb_dim=256, hid_dim=512, dropout=0.3):
     enc = Encoder(src_vocab_size, emb_dim, hid_dim, dropout=dropout, pad_idx=src_pad_idx)
@@ -306,9 +293,7 @@ def build_model(src_vocab_size, tgt_vocab_size, src_pad_idx, tgt_pad_idx, sos_id
     return model
 
 
-# --------------------------------------------------------------------------- #
-# Train / evaluate loops
-# --------------------------------------------------------------------------- #
+# Training and validation loops.
 def seq_lengths(batch_src, pad_idx):
     """Computes true (non-pad) length of every row in a padded batch."""
     lens = (batch_src != pad_idx).sum(dim=1)
@@ -356,7 +341,7 @@ def train_model(args):
     src_vocab = load_vocab(os.path.join(args.data_dir, "src_vocab.json"))
     tgt_vocab = load_vocab(os.path.join(args.data_dir, "tgt_vocab.json"))
     pad_idx = src_vocab.stoi[PAD]           # Encoder embedding padding_idx (SOURCE vocab)
-    tgt_pad_idx = tgt_vocab.stoi[PAD]       # FIX3: Decoder embedding padding_idx + loss ignore_index (TARGET vocab)
+    tgt_pad_idx = tgt_vocab.stoi[PAD]       # Decoder padding index and loss ignore index.
     sos_idx = tgt_vocab.stoi[SOS]
     eos_idx = tgt_vocab.stoi[EOS]
 
@@ -366,7 +351,7 @@ def train_model(args):
     train_loader = DataLoader(train_ds, batch_size=args.batch_size, shuffle=True)
     val_loader = DataLoader(val_ds, batch_size=args.batch_size, shuffle=False)
 
-    # FIX3: pass tgt_pad_idx through to build_model
+    # Configure the decoder with the target vocabulary's padding index.
     model = build_model(
         len(src_vocab), len(tgt_vocab), pad_idx, tgt_pad_idx, sos_idx, eos_idx,
         emb_dim=args.emb_dim, hid_dim=args.hid_dim, dropout=args.dropout,
@@ -375,7 +360,7 @@ def train_model(args):
     # label_smoothing softens the target distribution so the model isn't pushed
     # to put ~100% probability on a single token; this alone noticeably reduces
     # the "same token repeated forever" collapse mode on small NMT datasets.
-    # FIX3: ignore_index must be the TARGET vocab's pad id, not the source's.
+    # Ignore padded target positions when computing cross-entropy loss.
     criterion = nn.CrossEntropyLoss(ignore_index=tgt_pad_idx, label_smoothing=args.label_smoothing)
     # Halve the LR whenever val loss stops improving for 2 epochs, instead of
     # just letting it overfit at a constant LR until early stopping kicks in.
@@ -441,8 +426,7 @@ def train_model(args):
                 "hyperparameters": vars(args),
                 "src_vocab_size": len(src_vocab),
                 "tgt_vocab_size": len(tgt_vocab),
-                # FIX3: store BOTH pad indices so infer.py / evaluate.py can
-                # reconstruct the model with the correct per-vocab pad ids.
+                # Store both padding indices for checkpoint reconstruction.
                 "pad_idx": pad_idx, "tgt_pad_idx": tgt_pad_idx,
                 "sos_idx": sos_idx, "eos_idx": eos_idx,
                 "max_len": max_len,
@@ -480,9 +464,7 @@ def train_model(args):
     return model, src_vocab, tgt_vocab
 
 
-# --------------------------------------------------------------------------- #
-# Inference helper (used here for a quick sanity check, and reused by app.py)
-# --------------------------------------------------------------------------- #
+# Inference helper shared with the application.
 def translate_sentence(model, sentence, src_vocab, tgt_vocab, max_len=34,
                         decoding="greedy", beam_width=5):
     from src.preprocess import clean_text, tokenize_and_add_specials, encode_and_pad
@@ -506,7 +488,7 @@ def translate_sentence(model, sentence, src_vocab, tgt_vocab, max_len=34,
 
 
 def parse_args():
-    p = argparse.ArgumentParser(description="Train the Seq2Seq NMT model (Task 3).")
+    p = argparse.ArgumentParser(description="Train the Seq2Seq NMT model.")
     p.add_argument("--data_dir", type=str, default="data")
     p.add_argument("--model_dir", type=str, default="models")
     p.add_argument("--epochs", type=int, default=15)
@@ -528,10 +510,8 @@ def parse_args():
                     help="Stop early if val loss doesn't improve for this many epochs.")
     p.add_argument("--clip", type=float, default=1.0)
     p.add_argument("--teacher_forcing_ratio", type=float, default=0.6,
-                    help="Slightly reduced from 0.8 used in your last run, so the "
-                         "model sees more of its own (imperfect) predictions during "
-                         "training and doesn't rely so heavily on ground-truth tokens "
-                         "it won't have at inference time.")
+                    help="Fraction of decoder inputs replaced with ground-truth "
+                        "target tokens during training.")
     p.add_argument("--seed", type=int, default=42)
     p.add_argument("--resume", action="store_true",
                     help="Resume training from ./<model_dir>/nmt_model.pt instead of "
@@ -547,10 +527,7 @@ if __name__ == "__main__":
 
     model, src_vocab, tgt_vocab = train_model(args)
 
-    # Reload the BEST checkpoint (lowest val loss) before generating sample
-    # translations — the `model` object returned above holds the LAST epoch's
-    # weights, which may be worse than an earlier epoch if val loss rose
-    # (overfitting) later in training.
+    # Reload the checkpoint with the lowest validation loss before inference.
     with open(os.path.join(args.data_dir, "config.json")) as f:
         cfg = json.load(f)
     ckpt_path = os.path.join(args.model_dir, "nmt_model.pt")

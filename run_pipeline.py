@@ -13,21 +13,17 @@ from src.preprocess import (
 
 import argparse
 
-LANG = "hi"          # Target Indian language code
-N_SAMPLES = 60_000   # Raw sample download target
-MAX_LEN = 34         # Fixed sequence length (30 tokens + <sos> + <eos> + padding buffer)
+LANG = "hi"          # Language identifier passed to the dataset loader.
+N_SAMPLES = 60_000   # Maximum number of streamed source-target pairs.
+MAX_LEN = 34         # Fixed encoded length for source and target sequences.
 
 
 def parse_args():
-    p = argparse.ArgumentParser(description="Task 2 - Data pipeline")
+    p = argparse.ArgumentParser(description="Build the translation data pipeline")
     p.add_argument("--min_freq", type=int, default=4,
                     help="Minimum token frequency to enter the vocabulary. "
-                         "Raising this (from the old default of 2) shrinks the "
-                         "vocab a lot on a ~39k-sentence corpus, which is what "
-                         "you want: fewer rare/singleton tokens for the model "
-                         "to have to learn, less <unk> at inference time, and "
-                         "a much smaller (cheaper, less overfitting-prone) "
-                         "output softmax layer.")
+                         "Higher values exclude infrequent tokens, reducing "
+                         "vocabulary size and the output softmax dimensionality.")
     return p.parse_args()
 
 
@@ -37,42 +33,42 @@ def main():
     train/val/test splitting, and artifact saving pipeline.
     """
     args = parse_args()
-    # Ensure reproducible data splits across runs
+    # Set the split sampler seed so generated partitions are repeatable.
     random.seed(42)
     os.makedirs("data", exist_ok=True)
 
-    # Step 1: Stream raw parallel corpus from Hugging Face
+    # Stream source-target pairs from the remote dataset.
     print("[1/5] Fetching dataset from Hugging Face...")
     df_raw = load_raw_dataset(lang=LANG, n_samples=N_SAMPLES)
     df_raw.to_csv("samanantar_en_hi_raw_60k.csv", index=False)
 
-    # Step 2: Clean and filter text according to token count rules
+    # Normalize text and retain pairs within the configured token limits.
     print("[2/5] Cleaning text and applying sequence filters...")
     df_clean = clean_dataframe(df_raw, min_tokens=5, max_tokens=30)
     
-    # Add <sos> and <eos> special tokens to tokenized text
+    # Wrap each token sequence with decoder boundary markers.
     df_clean["en_tokens"] = df_clean["en"].apply(tokenize_and_add_specials)
     df_clean["tgt_tokens"] = df_clean["tgt"].apply(tokenize_and_add_specials)
 
-    # Step 3: Split dataset into Train (80%), Validation (10%), and Test (10%) sets
+    # Partition the cleaned pairs into training, validation, and test sets.
     print("[3/5] Splitting datasets (80/10/10)...")
     train_df, temp_df = train_test_split(df_clean, test_size=0.2, random_state=42)
     val_df, test_df = train_test_split(temp_df, test_size=0.5, random_state=42)
 
-    # Step 4: Build vocabularies exclusively from training split (prevents test data leakage)
+    # Derive token mappings from training sequences only.
     print("[4/5] Building source and target vocabularies...")
     src_vocab = Vocab(min_freq=args.min_freq).build(train_df["en_tokens"])
     tgt_vocab = Vocab(min_freq=args.min_freq).build(train_df["tgt_tokens"])
 
-    # Step 5: Encode text into padded integer ID sequences and save artifacts to disk
+    # Encode and persist fixed-width integer sequences.
     print("[5/5] Encoding, padding, and saving artifacts to ./data/...")
     
-    # Save raw sentence splits for app interface and metric evaluations (BLEU/ROUGE)
+    # Persist text pairs for application display and metric reference data.
     train_df[["en", "tgt"]].to_csv("data/train.csv", index=False)
     val_df[["en", "tgt"]].to_csv("data/val.csv", index=False)
     test_df[["en", "tgt"]].to_csv("data/test.csv", index=False)
 
-    # Helper function to process and save token ID arrays to JSON
+    # Encode both sides of a split and write the resulting arrays as JSON.
     def process_and_save_ids(df, path):
         src_ids = df["en_tokens"].apply(lambda t: encode_and_pad(t, src_vocab, MAX_LEN)).tolist()
         tgt_ids = df["tgt_tokens"].apply(lambda t: encode_and_pad(t, tgt_vocab, MAX_LEN)).tolist()
@@ -83,13 +79,13 @@ def main():
     process_and_save_ids(val_df, "data/val_ids.json")
     process_and_save_ids(test_df, "data/test_ids.json")
 
-    # Save vocabularies as JSON lists for Member 2 (Model) and Member 4 (App)
+    # Persist ordered token lists used to reconstruct vocabulary mappings.
     with open("data/src_vocab.json", "w", encoding="utf-8") as f:
         json.dump(src_vocab.itos, f, ensure_ascii=False)
     with open("data/tgt_vocab.json", "w", encoding="utf-8") as f:
         json.dump(tgt_vocab.itos, f, ensure_ascii=False)
 
-    # Save sequence metadata configuration file
+    # Persist sequence and vocabulary metadata used by model construction.
     with open("data/config.json", "w", encoding="utf-8") as f:
         json.dump({
             "MAX_LEN": MAX_LEN,

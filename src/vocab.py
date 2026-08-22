@@ -1,10 +1,6 @@
 from collections import Counter
 
-# Special tokens required for sequence processing
-# <pad>: Padding token to make all sequences equal length
-# <sos>: Start-of-sentence token indicating generation start
-# <eos>: End-of-sentence token indicating sentence end
-# <unk>: Unknown token for words not present in the vocabulary
+# Reserved tokens used by sequence encoding and decoding.
 PAD, SOS, EOS, UNK = "<pad>", "<sos>", "<eos>", "<unk>"
 
 
@@ -19,8 +15,8 @@ class Vocab:
             min_freq (int): Minimum occurrences required for a token to be included.
         """
         self.min_freq = min_freq
-        self.itos = [PAD, SOS, EOS, UNK]  # Index-to-String mapping
-        self.stoi = {}                    # String-to-Index mapping
+        self.itos = [PAD, SOS, EOS, UNK]  # Integer-to-token mapping.
+        self.stoi = {}                    # Token-to-integer mapping.
 
     def build(self, list_of_token_lists):
         """Counts word frequencies from training data and populates vocabulary mappings.
@@ -29,18 +25,18 @@ class Vocab:
         Returns:
             Vocab: The built Vocab instance.
         """
-        # Count occurrences of all non-special tokens across training samples
+        # Count non-reserved tokens across the supplied sequences.
         counter = Counter(
             tok for toks in list_of_token_lists for tok in toks
             if tok not in (PAD, SOS, EOS)
         )
         
-        # Add tokens meeting the minimum frequency threshold
+        # Append tokens that meet the minimum frequency threshold.
         for tok, freq in counter.items():
             if freq >= self.min_freq:
                 self.itos.append(tok)
                 
-        # Build inverse lookup table (Word -> Integer ID)
+        # Build the token-to-integer lookup table.
         self.stoi = {t: i for i, t in enumerate(self.itos)}
         return self
 
