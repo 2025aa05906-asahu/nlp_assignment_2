@@ -1,36 +1,36 @@
 {
   "n_test_pairs_scored": 500,
-  "n_test_pairs_total": 4873,
+  "n_test_pairs_total": 4492,
   "decoding": "greedy",
   "corpus_metrics": {
-    "BLEU": 13.3,
-    "chrF": 23.08,
-    "ROUGE-L": 43.47,
-    "METEOR": 20.37
+    "BLEU": 17.09,
+    "chrF": 22.66,
+    "ROUGE-L": 35.17,
+    "METEOR": 20.77
   },
   "failure_analysis": {
     "by_length": {
       "short (<10 tok)": {
-        "n": 162,
-        "avg_chrF": 21.43
+        "n": 157,
+        "avg_chrF": 22.81
       },
       "medium (10-20 tok)": {
-        "n": 228,
-        "avg_chrF": 23.66
+        "n": 268,
+        "avg_chrF": 23.11
       },
       "long (>20 tok)": {
-        "n": 110,
-        "avg_chrF": 22.81
+        "n": 75,
+        "avg_chrF": 22.69
       }
     },
     "repetition_loop_pct": 0.0,
-    "contains_unk_pct": 91.6
+    "contains_unk_pct": 88.2
   },
   "demo_examples": [
     {
       "tag": "short",
       "en": "how are you today",
-      "out": "आप कैसे <unk>"
+      "out": "कैसे आप क्या कर रहे हैं?"
     },
     {
       "tag": "short",
@@ -40,12 +40,12 @@
     {
       "tag": "named_entity",
       "en": "narendra modi visited the parliament in new delhi yesterday",
-      "out": "दिल्ली में नई दिल्ली में पीएम मोदी को दिल्ली"
+      "out": "दिल्ली में दिल्ली के नए दिल्ली में नई दिल्ली"
     },
     {
       "tag": "long_complex",
       "en": "although the weather was extremely unpredictable throughout the week, the farmers who had been waiting patiently for the monsoon finally managed to sow their crops before the deadline set by the local agricultural department",
-      "out": "<unk> के बाद <unk> में सबसे बड़ी <unk> के लिए <unk> ने बाद में <unk> के में <unk> की थी और <unk> के समय तक <unk> के की <unk> के साथ ही <unk>"
+      "out": "<unk> के <unk> <unk> ने <unk> <unk> को <unk> <unk> कर दिया था कि वे <unk> द्वारा <unk> <unk> द्वारा कर दिया गया"
     }
   ]
 }

@@ -49,9 +49,16 @@ def clean_dataframe(df: pd.DataFrame, min_tokens: int = 5, max_tokens: int = 30)
         if not en_c or not tgt_c:
             continue
 
-        # Filter by source sentence length (5 to 30 tokens)
-        n_tok = len(en_c.split())
-        if not (min_tokens <= n_tok <= max_tokens):
+        # Filter by BOTH source and target sentence length (5 to 30 tokens).
+        # MAX_LEN=34 assumes both sides fit that budget -- filtering only
+        # `en` let long Hindi targets get silently truncated in
+        # encode_and_pad() before <eos>, teaching the model wrong stopping
+        # behavior on exactly the longest/hardest examples.
+        n_tok_en = len(en_c.split())
+        n_tok_tgt = len(tgt_c.split())
+        if not (min_tokens <= n_tok_en <= max_tokens):
+            continue
+        if not (min_tokens <= n_tok_tgt <= max_tokens):
             continue
 
         # Deduplicate identical sentence pairs

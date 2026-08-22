@@ -22,9 +22,17 @@ def load_model(model_dir="models"):
     ckpt = torch.load(ckpt_path, map_location=DEVICE, weights_only=False)
     hp = ckpt["hyperparameters"]
 
+    # FIX3: build_model now needs src_pad_idx AND tgt_pad_idx separately.
+    # ckpt.get(..., fallback) keeps this working on OLD checkpoints saved
+    # before the fix (which only stored "pad_idx", using it for both sides) --
+    # but if you're loading such a checkpoint, retrain so it's saved with a
+    # correct, separate tgt_pad_idx instead of relying on this fallback.
+    src_pad_idx = ckpt["pad_idx"]
+    tgt_pad_idx = ckpt.get("tgt_pad_idx", ckpt["pad_idx"])
+
     model = build_model(
         ckpt["src_vocab_size"], ckpt["tgt_vocab_size"],
-        ckpt["pad_idx"], ckpt["sos_idx"], ckpt["eos_idx"],
+        src_pad_idx, tgt_pad_idx, ckpt["sos_idx"], ckpt["eos_idx"],
         emb_dim=hp["emb_dim"], hid_dim=hp["hid_dim"], dropout=hp["dropout"],
     )
     model.load_state_dict(ckpt["model_state_dict"])

@@ -1,12 +1,12 @@
 EN : how are you
-OUT: क्या आप कैसे हो सकते हैं?
+OUT: कैसे आप क्या कर रहे हैं?
 
 EN : what did you eat
-OUT: क्या आप क्या <unk>
+OUT: क्या क्या <unk> क्या क्या है?
 
 EN : good morning
 OUT: <unk> के लिए <unk>
 
 EN : the government has announced a new policy for farmers
-OUT: सरकार ने किसानों के लिए सरकार को किसानों को मंजूरी देने की है।
+OUT: सरकार सरकार ने किसानों सरकार सरकार की सरकार की है।
 

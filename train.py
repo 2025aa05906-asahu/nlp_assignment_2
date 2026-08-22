@@ -204,12 +204,12 @@ class Seq2Seq(nn.Module):
             if no_repeat_ngram_size > 0:
                 for i in range(src.size(0)):
                     seq = results[i]
-                    # Hard rule: never immediately repeat the token just generated.
-                    # This is the actual failure mode seen in practice (e.g. "kaise
-                    # kaise") - it's a 2-token pattern, which no_repeat_ngram_size=3
-                    # alone does not catch (that only blocks a 3-token pattern from
-                    # recurring later in the sequence).
-                    if len(seq) >= 1:
+                    # FIX2: Only ban a token if it would be the 3rd consecutive
+                    # repeat (seq[-1] == seq[-2] means we've already got a pair;
+                    # banning seq[-1] again stops a 3rd). This still allows
+                    # legitimate single reduplication in Hindi (e.g. dhire-dhire,
+                    # baar-baar) while blocking runaway "word word word" loops.
+                    if len(seq) >= 2 and seq[-1] == seq[-2]:
                         pred[i, seq[-1]] = float("-inf")
                     n = no_repeat_ngram_size
                     if len(seq) >= n - 1:
@@ -248,8 +248,8 @@ class Seq2Seq(nn.Module):
 
         def banned_tokens(seq, n):
             banned = set()
-            # Hard rule: never immediately repeat the token just generated.
-            if len(seq) >= 1:
+            # FIX2: Only ban a 3rd consecutive repeat; allow single reduplication.
+            if len(seq) >= 2 and seq[-1] == seq[-2]:
                 banned.add(seq[-1])
             if n <= 0 or len(seq) < n - 1:
                 return banned
@@ -293,11 +293,16 @@ class Seq2Seq(nn.Module):
         return best_seq
 
 
-def build_model(src_vocab_size, tgt_vocab_size, pad_idx, sos_idx, eos_idx,
+# FIX3: build_model now takes SEPARATE src_pad_idx and tgt_pad_idx, and routes
+# each to the correct submodule (Encoder gets src_pad_idx, Decoder gets
+# tgt_pad_idx). Previously a single `pad_idx` (really the SOURCE vocab's pad
+# id) was used for both encoder and decoder embeddings, which only worked
+# because both vocabs coincidentally place PAD at index 0.
+def build_model(src_vocab_size, tgt_vocab_size, src_pad_idx, tgt_pad_idx, sos_idx, eos_idx,
                  emb_dim=256, hid_dim=512, dropout=0.3):
-    enc = Encoder(src_vocab_size, emb_dim, hid_dim, dropout=dropout, pad_idx=pad_idx)
-    dec = Decoder(tgt_vocab_size, emb_dim, hid_dim, dropout=dropout, pad_idx=pad_idx)
-    model = Seq2Seq(enc, dec, pad_idx, sos_idx, eos_idx, DEVICE).to(DEVICE)
+    enc = Encoder(src_vocab_size, emb_dim, hid_dim, dropout=dropout, pad_idx=src_pad_idx)
+    dec = Decoder(tgt_vocab_size, emb_dim, hid_dim, dropout=dropout, pad_idx=tgt_pad_idx)
+    model = Seq2Seq(enc, dec, src_pad_idx, sos_idx, eos_idx, DEVICE).to(DEVICE)
     return model
 
 
@@ -350,7 +355,8 @@ def train_model(args):
 
     src_vocab = load_vocab(os.path.join(args.data_dir, "src_vocab.json"))
     tgt_vocab = load_vocab(os.path.join(args.data_dir, "tgt_vocab.json"))
-    pad_idx = src_vocab.stoi[PAD]
+    pad_idx = src_vocab.stoi[PAD]           # Encoder embedding padding_idx (SOURCE vocab)
+    tgt_pad_idx = tgt_vocab.stoi[PAD]       # FIX3: Decoder embedding padding_idx + loss ignore_index (TARGET vocab)
     sos_idx = tgt_vocab.stoi[SOS]
     eos_idx = tgt_vocab.stoi[EOS]
 
@@ -360,15 +366,17 @@ def train_model(args):
     train_loader = DataLoader(train_ds, batch_size=args.batch_size, shuffle=True)
     val_loader = DataLoader(val_ds, batch_size=args.batch_size, shuffle=False)
 
+    # FIX3: pass tgt_pad_idx through to build_model
     model = build_model(
-        len(src_vocab), len(tgt_vocab), pad_idx, sos_idx, eos_idx,
+        len(src_vocab), len(tgt_vocab), pad_idx, tgt_pad_idx, sos_idx, eos_idx,
         emb_dim=args.emb_dim, hid_dim=args.hid_dim, dropout=args.dropout,
     )
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     # label_smoothing softens the target distribution so the model isn't pushed
     # to put ~100% probability on a single token; this alone noticeably reduces
     # the "same token repeated forever" collapse mode on small NMT datasets.
-    criterion = nn.CrossEntropyLoss(ignore_index=pad_idx, label_smoothing=args.label_smoothing)
+    # FIX3: ignore_index must be the TARGET vocab's pad id, not the source's.
+    criterion = nn.CrossEntropyLoss(ignore_index=tgt_pad_idx, label_smoothing=args.label_smoothing)
     # Halve the LR whenever val loss stops improving for 2 epochs, instead of
     # just letting it overfit at a constant LR until early stopping kicks in.
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
@@ -433,7 +441,10 @@ def train_model(args):
                 "hyperparameters": vars(args),
                 "src_vocab_size": len(src_vocab),
                 "tgt_vocab_size": len(tgt_vocab),
-                "pad_idx": pad_idx, "sos_idx": sos_idx, "eos_idx": eos_idx,
+                # FIX3: store BOTH pad indices so infer.py / evaluate.py can
+                # reconstruct the model with the correct per-vocab pad ids.
+                "pad_idx": pad_idx, "tgt_pad_idx": tgt_pad_idx,
+                "sos_idx": sos_idx, "eos_idx": eos_idx,
                 "max_len": max_len,
                 "epoch": epoch,
                 "val_loss": val_loss,
