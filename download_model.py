@@ -22,7 +22,7 @@ from huggingface_hub import hf_hub_download
 REPO_ID = "buvika/group112-nmt-en-hi"   # <-- set to the actual HF repo id after upload
 FILENAME = "nmt_model.pt"
 DEST_PATH = os.path.join("models", "nmt_model.pt")
-EXPECTED_SHA256 = "2e40843c3ddaf9a3875a0bb19620e99bb56e745037824aea22db1efe82875b6"
+EXPECTED_SHA256 = "2e40843c3ddaf9a3875a0bb19620e99bb56e745037824aea22db1efe82875b69"
 EXPECTED_SIZE_BYTES = 56139874  # ~53.5 MB
 
 
