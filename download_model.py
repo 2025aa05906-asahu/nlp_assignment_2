@@ -1,11 +1,8 @@
 """
 Downloads the trained checkpoint (models/nmt_model.pt) from Hugging Face Hub.
 
-This mirrors run_pipeline.py's role for the data pipeline: the checkpoint is
-too large (54 MB) to include directly in Group112_Code.zip (10 MB upload
-limit), so this script fetches the exact checkpoint used for this submission
-and verifies its integrity, rather than requiring a full retrain to reproduce
-a working application (per the assignment's General Instructions).
+This complements run_pipeline.py by retrieving the checkpoint separately from
+the source and data artifacts, then verifying its integrity before use.
 
 Usage:
     python download_model.py
@@ -19,11 +16,11 @@ import shutil
 
 from huggingface_hub import hf_hub_download
 
-REPO_ID = "buvika/group112-nmt-en-hi"   # <-- set to the actual HF repo id after upload
+REPO_ID = "buvika/group112-nmt-en-hi"
 FILENAME = "nmt_model.pt"
 DEST_PATH = os.path.join("models", "nmt_model.pt")
 EXPECTED_SHA256 = "2e40843c3ddaf9a3875a0bb19620e99bb56e745037824aea22db1efe82875b69"
-EXPECTED_SIZE_BYTES = 56139874  # ~53.5 MB
+EXPECTED_SIZE_BYTES = 56139874  # Expected checkpoint size in bytes.
 
 
 def parse_args():
@@ -53,7 +50,7 @@ def already_present_and_valid(path):
 
 def main():
     """Fetches models/nmt_model.pt from Hugging Face Hub and verifies it
-    matches the checkpoint used for this submission's report and eval_report.json.
+    matches the checkpoint referenced by the evaluation artifacts.
     """
     args = parse_args()
     os.makedirs("models", exist_ok=True)

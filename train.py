@@ -455,7 +455,7 @@ def train_model(args):
     plt.savefig(os.path.join(args.model_dir, "loss_curve.png"), dpi=150)
     print(f"Saved loss curve to {args.model_dir}/loss_curve.png")
 
-    # Training log (config used + per-epoch losses, for the report)
+    # Persist hyperparameters, loss history, and the best validation loss.
     with open(os.path.join(args.model_dir, "training_log.json"), "w") as f:
         json.dump({"hyperparameters": vars(args), "history": history,
                    "best_val_loss": best_val_loss}, f, indent=2)

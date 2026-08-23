@@ -3,13 +3,10 @@ Loads the trained checkpoint (models/nmt_model.pt) and the held-out test
 split (data/test_ids.json), generates translations, and reports:
 
   1. Corpus-level automatic metrics: BLEU, chrF, ROUGE-L, METEOR
-  2. A qualitative demo on a curated set of sample sentences, including at
-     least one long/complex sentence (printed + saved so it can be
-    inspected alongside the computed metrics)
-  3. A programmatic failure-mode analysis: performance by sentence length,
-     repetition-loop detection, and OOV(<unk>)/rare-word impact — these are
-     the "rare words / named entities / long sentences / word-order" angles
-    including rare words, named entities, long sentences, and word order.
+  2. Qualitative translations for representative short, named-entity, and
+      long/complex sentences
+  3. Failure-mode analysis by sentence length, repetition, and unknown-token
+      frequency
 """
 
 import argparse
