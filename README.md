@@ -212,7 +212,7 @@ python evaluate.py --n_samples 500
 ## Known issues
 
 * Validation loss plateaus at approximately 5.87 to 5.88 after epoch 20 despite continued training and learning rate reduction. This reflects a capacity and data size limit of a 256-hidden-unit LSTM trained on roughly 36,000 sentence pairs, not an undertrained model.
-* 88.2 percent of evaluated outputs contain at least one `<unk>` token. This is the primary translation quality limitation, driven by the `min_freq=4` vocabulary cutoff and limited training data.
+* 88.8 percent of evaluated outputs contain at least one `<unk>` token. This is the primary translation quality limitation, driven by the `min_freq=4` vocabulary cutoff and limited training data.
 * Regenerating data via `run_pipeline.py` requires internet access to Hugging Face.
 * Training on CPU is slow because LSTMs are sequential. A GPU is recommended for training, though the application itself runs on CPU without issue once a checkpoint exists.
 * `samanantar_en_hi_raw_60k.csv` is included for traceability of the cleaning step and is not required by the application, inference, or evaluation scripts.
