@@ -114,6 +114,8 @@ Features:
 4. Batch translation via .txt upload (one sentence per line) or .csv upload (english column).
 5. Downloadable CSV of batch translation results.
 
+Note: no `.ipynb` notebooks, `.py` scripts submitted instead
+
 ## Repository structure
 
 ```
